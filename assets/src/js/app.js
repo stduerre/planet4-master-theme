@@ -8,7 +8,7 @@ import { setupImageAlign } from './img_align';
 import { setupLoadMore } from './load_more';
 import { setupPDFIcon } from './pdf_icon';
 import { setupSearch } from './search';
-import { setupImageZoomer } from './single';
+import { setupLightBox } from './lightbox';
 import { setupExternalLinks } from './external_links';
 import { setupLazyLoad } from './lazyload';
 import { setupCSSVarsPonyfill } from './cssvarsponyfill';
@@ -36,7 +36,7 @@ jQuery(function($) {
   setupLoadMore($);
   setupPDFIcon($);
   setupSearch($);
-  setupImageZoomer($);
+  setupLightBox($);
   setupExternalLinks($);
   setupCSSVarsPonyfill();
 });
