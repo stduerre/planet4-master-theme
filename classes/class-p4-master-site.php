@@ -174,6 +174,8 @@ class P4_Master_Site extends TimberSite {
 		add_filter( 'attachment_fields_to_edit', [ $this, 'add_image_attachment_fields_to_edit' ], 10, 2 );
 		add_filter( 'attachment_fields_to_save', [ $this, 'add_image_attachment_fields_to_save' ], 10, 2 );
 		add_action( 'init', [ $this, 'p4_register_core_image_block' ] );
+		add_action( 'admin_notices', [ $this, 'show_dashboard_notice' ] );
+		add_action( 'wp_ajax_dismiss_dashboard_notice', [ $this, 'dismiss_dashboard_notice' ] );
 	}
 
 	/**
@@ -964,5 +966,79 @@ class P4_Master_Site extends TimberSite {
 		}
 
 		return $content;
+	}
+
+	/**
+	 * Show P4 team message on dashboard.
+	 */
+	public function show_dashboard_notice(): void {
+		// Show only on dashboard.
+		$screen = get_current_screen();
+		if ( null === $screen || 'dashboard' !== $screen->id ) {
+			return;
+		}
+		// Don't show a dismissed version.
+		$tag         = '2.32.2';
+		$last_notice = get_user_meta( get_current_user_id(), 'last_p4_notice', 1 );
+		if ( version_compare( $tag, $last_notice, '<=' ) ) {
+			return;
+		}
+
+		echo '<div id="p4-notice" class="notice notice-info is-dismissible">'
+			. wp_kses_post( $this->p4_message() )
+			. '</div>'
+			. "<script>(function() {
+				jQuery('#p4-notice').on('click', '.notice-dismiss', () => {
+					jQuery.post(ajaxurl, {'action': 'dismiss_dashboard_notice'}, function(response) {
+						jQuery('#p4-notice').hide();
+					});
+				});
+			})();</script>
+			";
+	}
+
+	/**
+	 * A message from Planet4 team.
+	 *
+	 * @return string
+	 */
+	private function p4_message(): string {
+		/** @param int $ticket_id Jira ticket id (PLANET-{id}); */
+		$ticket = function ( int $ticket_id ): string {
+			return '<a href="https://jira.greenpeace.org/browse/PLANET-' . $ticket_id . '">
+				PLANET-' . $ticket_id . '</a>';
+		};
+
+		return '<h2>New release !</h2>
+		<p>A new Planet 4 release has been deployed. Below is the full list of changes.</p>
+		<p style="font-weight: bold">2.32.2 - 2020-06-09</p>
+		<p>
+			🔧 Features
+			<ul>
+			<li>' . $ticket( 5126 ) . ' - Take Action Boxout: Simplify passive state of cards on desktop and mobile</li>
+			<li>' . $ticket( 5081 ) . ' - Add option for enhanced mobile Donate button in settings</li>
+			<li>' . $ticket( 5060 ) . ' - Simplify passive state of Take Action cards on desktop and mobile</li>
+			<li>' . $ticket( 5017 ) . ' - Re-implement Spreadsheet block frontend in React</li>
+			<li>' . $ticket( 4914 ) . ' - Spreadsheet block: Sticky header and sorting UX</li>
+			</ul>
+			🐞 Bug Fixes
+			<ul>
+			<li>' . $ticket( 5166 ) . ' - Integration with Smartsheet API is not working</li>
+			<li>' . $ticket( 5160 ) . ' - Search seems broken, always no result (in admin)</li>
+			<li>' . $ticket( 5145 ) . ' - Search 500 error when post type is deleted</li>
+			<li>' . $ticket( 5088 ) . ' - Search box: magnifier overlaps \'x\' button</li>
+			<li>' . $ticket( 5034 ) . ' - Archive label text shown outside of label for Japan</li>
+			</ul>
+		</p>';
+	}
+
+	/**
+	 * Dismiss P4 notice of dashboard, by saving the last version read in user options.
+	 *
+	 * @return bool
+	 */
+	public function dismiss_dashboard_notice(): bool {
+		//return update_user_meta( get_current_user_id(), 'last_p4_notice', '2.32.2' );
+		return true;
 	}
 }
