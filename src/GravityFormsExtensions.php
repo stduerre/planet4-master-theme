@@ -4,6 +4,9 @@ namespace P4\MasterTheme;
 
 use GFAPI;
 use Timber\Timber;
+use P4GBKS\Search\BlockSearch;
+use P4GBKS\Search\PatternSearch;
+use P4GBKS\Search\Block\Query\Parameters;
 
 /**
  * Class P4\MasterTheme\GravityFormsExtensions
@@ -96,6 +99,7 @@ class GravityFormsExtensions
         add_filter('gform_confirmation', [ $this, 'p4_gf_custom_confirmation' ], 10, 3);
         add_filter('gform_field_css_class', [ $this, 'p4_gf_custom_field_class' ], 10, 3);
         add_filter('gform_form_args', [ $this, 'p4_gf_enforce_ajax' ], 10, 3);
+        add_action( 'gform_after_save_form', [ $this, 'p4_gf_clear_page_caches' ], 10, 2 );
     }
 
     /**
@@ -338,5 +342,63 @@ class GravityFormsExtensions
         $form_args['ajax'] = true;
 
         return $form_args;
+    }
+
+    /**
+     * Purges the caches of pages that contain a form
+     *
+     * @param array $form The form to look for when purging page caches
+     * @param bool $is_new Form is new
+     *
+     * @return void
+     */
+    public function p4_gf_clear_page_caches( array $form, bool $is_new = false ) {
+        if ( ! $is_new ) {
+            /**
+             * Filter hook to change post types that are cleared from cache if they contain a form that has changed
+             *
+             * @param array $post_types Array of post types to consider for cache clearing after form update
+             */
+            $post_types = apply_filters( 'planet4_form_cache_purge_post_types', [ 'page', 'post', 'campaign' ] );
+
+            // Find posts that contain the form
+            $parameters = ( new Parameters() )
+                ->with_name( 'gravityforms/form' )
+                ->with_post_type( $post_types )
+                ->with_attributes( [
+                    'formId' => strval( $form['id'] ),
+                ] );
+
+            $posts = ( new BlockSearch() )->get_posts( $parameters );
+
+            // Find reusable blocks that contain the form
+            $parameters = ( new Parameters() )
+                ->with_name( 'gravityforms/form' )
+                ->with_post_type( [ 'wp_block' ] )
+                ->with_attributes( [
+                    'formId' => strval( $form['id'] ),
+                ] );
+
+            $reusable_blocks = ( new BlockSearch() )->get_posts( $parameters );
+
+            foreach ( $reusable_blocks as $block ) {
+                // Find posts that contain the reusable blocks
+                $parameters = ( new Parameters() )
+                    ->with_name( 'block' )
+                    ->with_post_type( $post_types )
+                    ->with_attributes( [
+                        'ref' => $block,
+                    ] );
+
+                $posts = array_unique( array_merge( $posts, ( new BlockSearch() )->get_posts( $parameters ) ) );
+            }
+
+            foreach ( $posts as $post_id ) {
+                // Updating the post triggers clearing the cache without making any changes.
+                wp_update_post( [
+                    'ID' => $post_id,
+                ], false, true );
+            }
+        }
     }
 }
